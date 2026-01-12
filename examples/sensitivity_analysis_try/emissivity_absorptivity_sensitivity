@@ -1,0 +1,126 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import linerate
+
+# Create towers for a span
+start_tower = linerate.Tower(latitude=50 - 0.0045, longitude=0, altitude=500 - 88)
+end_tower = linerate.Tower(latitude=50 + 0.0045, longitude=0, altitude=500 + 88)
+
+time_of_measurement = np.datetime64("2016-10-03T14:00")
+
+# Sensitivity targets: emissivity and solar_absorptivity
+vars_info = {
+    "emissivity": {"label": "Emissivity (ε)", "baseline": 0.8, "bounds": [0.7, 0.9]},
+    "solar_absorptivity": {"label": "Solar absorptivity (α_s)", "baseline": 0.8, "bounds": [0.7, 0.9]},
+}
+
+n_points = 60
+Tmax_for_rating = 50.0 
+
+weather = linerate.Weather(
+        air_temperature=20.0,
+        wind_direction=np.radians(80),
+        wind_speed=1.66,
+        ground_albedo=0.15,
+        clearness_ratio=0.5,
+    )
+
+def eval_ampacities(epsilon, alpha_s):
+    conductor = linerate.Conductor(
+        core_diameter=10.4e-3,
+        conductor_diameter=28.1e-3,
+        outer_layer_strand_diameter=2.2e-3,
+        emissivity=epsilon,
+        solar_absorptivity=alpha_s,
+        temperature1=25,
+        temperature2=75,
+        resistance_at_temperature1=7.283e-5,
+        resistance_at_temperature2=8.688e-5,
+        aluminium_cross_section_area=float("nan"),
+        constant_magnetic_effect=1,
+        current_density_proportional_magnetic_effect=0,
+        max_magnetic_core_relative_resistance_increase=1,
+    )
+    span = linerate.Span(conductor=conductor, start_tower=start_tower, end_tower=end_tower, num_conductors=1)
+    amp_cigre = linerate.Cigre601(span, weather, time_of_measurement).compute_steady_state_ampacity(np.array([Tmax_for_rating]))[0]
+    amp_ieee = linerate.IEEE738(span, weather, time_of_measurement).compute_steady_state_ampacity(np.array([Tmax_for_rating]))[0]
+    return amp_cigre, amp_ieee
+
+def eval_ampacities_simultaneous_change(epsilon):
+    conductor = linerate.Conductor(
+        core_diameter=10.4e-3,
+        conductor_diameter=28.1e-3,
+        outer_layer_strand_diameter=2.2e-3,
+        emissivity=epsilon,
+        solar_absorptivity=epsilon,
+        temperature1=25,
+        temperature2=75,
+        resistance_at_temperature1=7.283e-5,
+        resistance_at_temperature2=8.688e-5,
+        aluminium_cross_section_area=float("nan"),
+        constant_magnetic_effect=1,
+        current_density_proportional_magnetic_effect=0,
+        max_magnetic_core_relative_resistance_increase=1,
+    )
+    span = linerate.Span(conductor=conductor, start_tower=start_tower, end_tower=end_tower, num_conductors=1)
+    amp_cigre = linerate.Cigre601(span, weather, time_of_measurement).compute_steady_state_ampacity(np.array([Tmax_for_rating]))[0]
+    amp_ieee = linerate.IEEE738(span, weather, time_of_measurement).compute_steady_state_ampacity(np.array([Tmax_for_rating]))[0]
+    return amp_cigre, amp_ieee
+
+# Plot sweeps for each target variable
+# for var_key, info in vars_info.items():
+#     lo, hi = info["bounds"]
+#     xs = np.linspace(lo, hi, n_points)
+#     amps_cigre = np.empty(n_points)
+#     amps_ieee = np.empty(n_points)
+
+#     for i, x in enumerate(xs):
+#         # set surface properties: vary the target, keep the other at baseline
+#         if var_key == "emissivity":
+#             eps = float(x)
+#             alpha = vars_info["solar_absorptivity"]["baseline"]
+#         else:
+#             eps = vars_info["emissivity"]["baseline"]
+#             alpha = float(x)
+
+#         amp_cigre, amp_ieee = eval_ampacities(
+#             epsilon=eps,
+#             alpha_s=alpha
+#         )
+#         amps_cigre[i] = amp_cigre
+#         amps_ieee[i] = amp_ieee
+
+#     plt.figure(figsize=(6, 4))
+#     plt.plot(xs, amps_cigre, "-k", label="CIGRE 601")
+#     plt.plot(xs, amps_ieee, "--r", label="IEEE 738")
+#     plt.xlabel(info["label"])
+#     plt.ylabel("Conductor Ampacity (A)")
+#     plt.title(f"Ampacity vs {info['label']} Sensitivity Analysis")
+#     plt.ylim(1450, 1550) 
+#     plt.legend()
+#     plt.grid()
+#     plt.tight_layout()
+#     plt.show()
+
+#==============================================================
+# Plot simultaneous change of emissivity and solar absorptivity
+lo, hi = vars_info["emissivity"]["bounds"]
+xs = np.linspace(lo, hi, n_points)
+amps_cigre = np.empty(n_points)
+amps_ieee = np.empty(n_points)
+for i, x in enumerate(xs):
+    epsilon = float(x)
+    amp_cigre, amp_ieee = eval_ampacities_simultaneous_change(epsilon=epsilon)
+    amps_cigre[i] = amp_cigre
+    amps_ieee[i] = amp_ieee
+plt.figure(figsize=(8, 4))
+plt.plot(xs, amps_cigre, "-k", label="CIGRE 601")
+plt.plot(xs, amps_ieee, "--r", label="IEEE 738")
+plt.xlabel("Emissivity and Solar Absorptivity (ε = α_s)")
+plt.ylabel("Conductor Ampacity (A)")
+plt.title("Ampacity vs Emissivity and Solar Absorptivity (when ε and α change together)")
+# plt.ylim(1450, 1550)  
+plt.legend()
+plt.grid()
+plt.tight_layout()
+plt.show()

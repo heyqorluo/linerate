@@ -122,7 +122,7 @@ class Cigre601(ThermalModel):
 
         Nu = cigre601.convective_cooling.compute_nusselt_number(
             forced_convection_nusselt_number=Nu_delta, natural_nusselt_number=Nu_beta
-        )
+        ) # take the max one
 
         return convective_cooling.compute_convective_cooling(
             surface_temperature=conductor_temperature,
